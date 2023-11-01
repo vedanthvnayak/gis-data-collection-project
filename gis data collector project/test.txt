@@ -1,0 +1,174 @@
+function updateObjectTable() {
+            const tableBody = document.querySelector("#object-table tbody");
+            tableBody.innerHTML = "";
+            objectDataArray.forEach(function (objectData) {
+                const row = tableBody.insertRow();
+                const nameCell = row.insertCell(0);
+                const countCell = row.insertCell(1);
+                const locationCell = row.insertCell(2);
+                nameCell.textContent = objectData.name;
+                countCell.textContent = objectData.count;
+                locationCell.textContent = objectData.location;
+            });
+        }
+
+        function addObjectData(objectName, objectCount, location) {
+            const objectData = {
+                name: objectName,
+                count: objectCount,
+                location: location,
+            };
+            objectDataArray.push(objectData);
+            updateObjectTable();
+            saveObjectDataToStorage();
+
+            objectNameInput.value = "";
+            objectCountInput.value = "";
+            locationInput.value = "";
+            if (marker) {
+                map.removeLayer(marker);
+            }
+        }
+        document.addEventListener("DOMContentLoaded", function () {
+            const params = new URLSearchParams(window.location.search);
+            const username = params.get("username");
+            const date = params.get("date");
+            document.getElementById("username").value = username;
+            document.getElementById("date").value = date;
+
+            const objectEntryForm = document.getElementById("object-entry-form");
+            const objectNameInput = document.getElementById("object-name");
+            const objectCountInput = document.getElementById("object-count");
+            const locationInput = document.getElementById("location");
+            const objectList = document.getElementById("object-names");
+            const mapDiv = document.getElementById("map");
+            const getLocationButton = document.getElementById("get-location");
+            const manualLocationToggle = document.getElementById("manual-location-toggle");
+
+            let isManualLocationMode = false;
+            let marker;
+            const objectDataArray = JSON.parse(localStorage.getItem("objectDataArray")) || [];
+
+            const map = L.map(mapDiv).setView([0, 0], 2);
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 19,
+            }).addTo(map);
+
+            function updateObjectList() {
+                objectList.innerHTML = "";
+                objectDataArray.forEach(function (objectData) {
+                    const listItem = document.createElement("li");
+                    listItem.textContent = `${objectData.name} (Count: ${objectData.count}) - Location: ${objectData.location}`;
+                    objectList.appendChild(listItem);
+                });
+            }
+
+            function saveObjectDataToStorage() {
+                localStorage.setItem("objectDataArray", JSON.stringify(objectDataArray));
+            }
+
+            function addObjectData(objectName, objectCount, location) {
+                const objectData = {
+                    name: objectName,
+                    count: objectCount,
+                    location: location,
+                };
+                objectDataArray.push(objectData);
+                updateObjectList();
+                saveObjectDataToStorage();
+
+                objectNameInput.value = "";
+                objectCountInput.value = "";
+                locationInput.value = "";
+                if (marker) {
+                    map.removeLayer(marker);
+                }
+            }
+
+            objectEntryForm.addEventListener("submit", function (event) {
+                event.preventDefault();
+
+                const objectName = objectNameInput.value.trim();
+                const objectCount = objectCountInput.value.trim();
+                const location = locationInput.value.trim();
+
+                if (objectName && objectCount && location) {
+                    addObjectData(objectName, objectCount, location);
+                } else {
+                    alert("Please fill in all fields.");
+                }
+            });
+
+            getLocationButton.addEventListener("click", () => {
+                if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(function (position) {
+                        const latitude = position.coords.latitude;
+                        const longitude = position.coords.longitude;
+                        const locationString = `Latitude: ${latitude}, Longitude: ${longitude}`;
+                        locationInput.value = locationString;
+
+                        if (marker) {
+                            map.removeLayer(marker);
+                        }
+                        marker = L.marker([latitude, longitude]).addTo(map);
+                    });
+                } else {
+                    locationInput.value = "Geolocation is not supported in this browser.";
+                }
+            });
+
+            manualLocationToggle.addEventListener("click", () => {
+                isManualLocationMode = !isManualLocationMode;
+
+                if (isManualLocationMode) {
+                    manualLocationToggle.textContent = "Manual Location Mode (Enabled)";
+                    manualLocationToggle.classList.remove("disabled");
+                } else {
+                    manualLocationToggle.textContent = "Manual Location Mode (Disabled)";
+                    manualLocationToggle.classList.add("disabled");
+                }
+
+                if (isManualLocationMode) {
+                    locationInput.value = "";
+                    if (marker) {
+                        map.removeLayer(marker);
+                    }
+                }
+            });
+
+            map.on("click", function (e) {
+                if (isManualLocationMode) {
+                    const latitude = e.latlng.lat.toFixed(6);
+                    const longitude = e.latlng.lng.toFixed(6);
+                    const locationString = `Latitude: ${latitude}, Longitude: ${longitude}`;
+                    locationInput.value = locationString;
+
+                    if (marker) {
+                        map.removeLayer(marker);
+                    }
+                    marker = L.marker([latitude, longitude]).addTo(map);
+                }
+            });
+
+            const downloadButton = document.getElementById("download-list");
+            downloadButton.addEventListener("click", function () {
+                if (objectDataArray.length > 0) {
+                    const data = JSON.stringify(objectDataArray, null, 2);
+                    const blob = new Blob([data], { type: "application/json" });
+                    const url = window.URL.createObjectURL(blob);
+
+                    const a = document.createElement("a");
+                    a.style.display = "none";
+                    a.href = url;
+                    a.download = "object_list.json";
+                    document.body.appendChild(a);
+                    a.click();
+
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    alert("The object list is empty.");
+                }
+            });
+
+            manualLocationToggle.click();
+        });

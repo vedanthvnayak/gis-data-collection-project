@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Field-Object Mapping</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+      /* Reset some default styles for a clean slate */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f0f0f0;
+      }
+
+      header {
+        background-color: #333;
+        color: #fff;
+        text-align: center;
+        padding: 20px 0;
+      }
+
+      h1 {
+        font-size: 28px;
+        margin-bottom: 10px;
+      }
+
+      main {
+        max-width: 1200px;
+        margin: 20px auto;
+        padding: 20px;
+        background-color: #fff;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 20px;
+      }
+
+      #object-list {
+        flex: 1;
+        padding: 20px;
+        background-color: #f7f7f7;
+        border-radius: 10px;
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        max-height: 400px;
+        /* Set the maximum height for the list */
+        overflow-y: auto;
+        /* Enable vertical scrolling if content overflows */
+      }
+
+      h2 {
+        font-size: 24px;
+        margin-bottom: 20px;
+      }
+
+      #object-names {
+        list-style: none;
+        padding-left: 0;
+      }
+
+      #object-names li {
+        font-size: 16px;
+        margin-bottom: 10px;
+      }
+
+      #map {
+        flex: 2;
+        height: 400px;
+        border-radius: 10px;
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+      }
+
+      #object-entry-form {
+        flex: 1;
+        padding: 20px;
+        background-color: #f7f7f7;
+        border-radius: 10px;
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        max-height: 400px;
+        /* Set the maximum height for the form */
+        overflow-y: auto;
+        /* Enable vertical scrolling if content overflows */
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 15px;
+        /* Add margin between form groups */
+      }
+
+      label {
+        font-size: 18px;
+        margin-bottom: 5px;
+      }
+
+      input[type="text"],
+      input[type="number"] {
+        font-size: 16px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+
+      .disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+
+      /* Add this CSS to style the entered list items */
+      .object-item {
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+
+      .object-details {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .object-info {
+        margin-bottom: 5px;
+      }
+
+      .object-property {
+        font-weight: bold;
+        margin-right: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>QGIS Mapping</h1>
+    </header>
+    <main>
+      <div id="object-list">
+        <h2>Entered List</h2>
+        <ul id="object-names">
+          <!-- Object names and counts will be displayed here -->
+        </ul>
+      </div>
+      <div id="map"></div>
+      <form id="object-entry-form">
+        <h2>Enter Information</h2>
+        <div class="form-group">
+          <label for="username">User Name:</label>
+          <input type="text" id="username" readonly>
+        </div>
+        <div class="form-group">
+          <label for="date">Date:</label>
+          <input type="text" id="date" readonly>
+        </div>
+        <div class="form-group">
+          <label for="time">Time:</label>
+          <input type="text" id="time" readonly>
+        </div>
+        <div class="form-group">
+          <label for="object-name">Object Name:</label>
+          <input type="text" id="object-name" required>
+        </div>
+        <div class="form-group">
+          <label for="object-count">Count:</label>
+          <input type="number" id="object-count" required>
+        </div>
+        <div class="form-group">
+          <label for="location">Location:</label>
+          <input type="text" id="location" readonly>
+        </div>
+        <button type="button" id="manual-location-toggle" class="disabled">Manual Location Mode (Disabled)</button>
+        <button type="button" id="get-location">Get Location</button>
+        <button type="submit">Submit</button>
+      </form>
+    </main>
+    <button id="download-list">Download List</button>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        const params = new URLSearchParams(window.location.search);
+        const timeInput = document.getElementById("time");
+        const username = params.get("username");
+        const date = params.get("date");
+        document.getElementById("username").value = username;
+        document.getElementById("date").value = date;
+        const objectEntryForm = document.getElementById("object-entry-form");
+        const objectNameInput = document.getElementById("object-name");
+        const objectCountInput = document.getElementById("object-count");
+        const locationInput = document.getElementById("location");
+        const objectList = document.getElementById("object-names");
+        const mapDiv = document.getElementById("map");
+        const getLocationButton = document.getElementById("get-location");
+        const manualLocationToggle = document.getElementById("manual-location-toggle");
+        let isManualLocationMode = false;
+        let marker;
+        const objectDataArray = JSON.parse(localStorage.getItem("objectDataArray")) || [];
+        const map = L.map(mapDiv).setView([0, 0], 2);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+        }).addTo(map);
+
+        function getCurrentTime() {
+          const now = new Date();
+          const hours = now.getHours().toString().padStart(2, "0");
+          const minutes = now.getMinutes().toString().padStart(2, "0");
+          const timeString = `${hours}:${minutes}`;
+          return timeString;
+        }
+        // Update the time input every second
+        setInterval(function() {
+          const currentTime = getCurrentTime();
+          timeInput.value = currentTime;
+        }, 1000);
+        timeInput.value = getCurrentTime();
+
+        function updateObjectList() {
+          objectList.innerHTML = "";
+          objectDataArray.forEach(function(objectData) {
+            const listItem = document.createElement("li");
+            listItem.classList.add("object-item");
+            listItem.innerHTML = `
+            
+											<div class="object-details">
+												<div class="object-info">
+													<span class="object-property">Name:</span> ${objectData.name}
+                
+												</div>
+												<div class="object-info">
+													<span class="object-property">Count:</span> ${objectData.count}
+                
+												</div>
+												<div class="object-info">
+													<span class="object-property">Location:</span> ${objectData.location}
+                
+												</div>
+												<div class="object-info">
+													<span class="object-property">Time:</span> ${objectData.time}
+                
+												</div>
+											</div>
+        `;
+            objectList.appendChild(listItem);
+          });
+        }
+
+        function saveObjectDataToStorage() {
+          localStorage.setItem("objectDataArray", JSON.stringify(objectDataArray));
+        }
+
+        function addObjectData(objectName, objectCount, location) {
+          const currentTime = getCurrentTime(); // Get current time
+          const objectData = {
+            name: objectName,
+            count: objectCount,
+            location: location,
+            time: currentTime, // Store the current time along with the object data
+          };
+          objectDataArray.push(objectData);
+          updateObjectList();
+          saveObjectDataToStorage();
+          objectNameInput.value = "";
+          objectCountInput.value = "";
+          locationInput.value = "";
+          if (marker) {
+            map.removeLayer(marker);
+          }
+        }
+        objectEntryForm.addEventListener("submit", function(event) {
+          event.preventDefault();
+          const objectName = objectNameInput.value.trim();
+          const objectCount = objectCountInput.value.trim();
+          const location = locationInput.value.trim();
+          if (objectName && objectCount && location) {
+            addObjectData(objectName, objectCount, location);
+          } else {
+            alert("Please fill in all fields.");
+          }
+        });
+        getLocationButton.addEventListener("click", () => {
+          if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+              const latitude = position.coords.latitude;
+              const longitude = position.coords.longitude;
+              const locationString = `Latitude: ${latitude}, Longitude: ${longitude}`;
+              locationInput.value = locationString;
+              if (marker) {
+                map.removeLayer(marker);
+              }
+              marker = L.marker([latitude, longitude]).addTo(map);
+            });
+          } else {
+            locationInput.value = "Geolocation is not supported in this browser.";
+          }
+        });
+        manualLocationToggle.addEventListener("click", () => {
+          isManualLocationMode = !isManualLocationMode;
+          if (isManualLocationMode) {
+            manualLocationToggle.textContent = "Manual Location Mode (Enabled)";
+            manualLocationToggle.classList.remove("disabled");
+          } else {
+            manualLocationToggle.textContent = "Manual Location Mode (Disabled)";
+            manualLocationToggle.classList.add("disabled");
+          }
+          if (isManualLocationMode) {
+            locationInput.value = "";
+            if (marker) {
+              map.removeLayer(marker);
+            }
+          }
+        });
+        map.on("click", function(e) {
+          if (isManualLocationMode) {
+            const latitude = e.latlng.lat.toFixed(6);
+            const longitude = e.latlng.lng.toFixed(6);
+            const locationString = `Latitude: ${latitude}, Longitude: ${longitude}`;
+            locationInput.value = locationString;
+            if (marker) {
+              map.removeLayer(marker);
+            }
+            marker = L.marker([latitude, longitude]).addTo(map);
+          }
+        });
+        const downloadButton = document.getElementById("download-list");
+        downloadButton.addEventListener("click", function() {
+          if (objectDataArray.length > 0) {
+            const username = document.getElementById("username").value;
+            const date = document.getElementById("date").value;
+            const time = document.getElementById("time").value; // Get the time value
+            const dataToDownload = {
+              username: username,
+              date: date,
+              time: time, // Add the time field to the data
+              objects: objectDataArray,
+            };
+            const data = JSON.stringify(dataToDownload, null, 2);
+            const blob = new Blob([data], {
+              type: "application/json"
+            });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.style.display = "none";
+            a.href = url;
+            a.download = "object_list.json";
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+          } else {
+            alert("The object list is empty.");
+          }
+        });
+        manualLocationToggle.click();
+      });
+    </script>
+  </body>
+</html>
