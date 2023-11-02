@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>Field-Object Mapping</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+    />
+    <style>
+      /* Reset some default styles for a clean slate */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f0f0f0;
+      }
+
+      header {
+        background-color: #333;
+        color: #fff;
+        text-align: center;
+        padding: 20px 0;
+      }
+
+      h1 {
+        font-size: 28px;
+        margin-bottom: 10px;
+      }
+
+      main {
+        max-width: 1200px;
+        margin: 20px auto;
+        padding: 20px;
+        background-color: #fff;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      #object-list {
+        flex: 1;
+        padding: 20px;
+        background-color: #f7f7f7;
+        border-radius: 10px;
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      h2 {
+        font-size: 24px;
+        margin-bottom: 20px;
+      }
+
+      #object-names {
+        list-style: none;
+        padding-left: 0;
+      }
+
+      #object-names li {
+        font-size: 16px;
+        margin-bottom: 10px;
+      }
+
+      #map {
+        flex: 2;
+        height: 400px;
+        border-radius: 10px;
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+      }
+
+      #object-entry-form {
+        flex: 1;
+        padding: 20px;
+        background-color: #f7f7f7;
+        border-radius: 10px;
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 15px;
+      }
+
+      label {
+        font-size: 18px;
+        margin-bottom: 5px;
+      }
+
+      input[type="text"],
+      input[type="number"] {
+        font-size: 16px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+
+      .object-item {
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+
+      .object-details {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .object-info {
+        margin-bottom: 5px;
+      }
+
+      .object-property {
+        font-weight: bold;
+        margin-right: 5px;
+      }
+
+      #get-location {
+        background-color: #007BFF;
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+
+      #get-location:hover {
+        background-color: #0056b3;
+      }
+
+      #object-entry-form button[type="submit"] {
+        background-color: #007BFF;
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+
+      #object-entry-form button[type="submit"]:hover {
+        background-color: #0056b3;
+      }
+
+      #manual-location-toggle.disabled {
+        display: none;
+        visibility: hidden;
+      }
+
+      #object-name input[type="checkbox"] {
+        margin-right: 5px;
+      }
+      
+      #download-list {
+        background-color: #0074d9;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        cursor: pointer;
+        border-radius: 5px;
+        font-size: 16px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        margin: 10px 0;
+        transition: background-color 0.3s, color 0.3s;
+      }
+
+      #download-list:hover {
+        background-color: #0056b3;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Field-Object Mapping</h1>
+    </header>
+    <main>
+      <div id="map"></div>
+      <form id="object-entry-form">
+        <h2>Enter Information</h2>
+        <div class="form-group">
+          <label for="username">User Name:</label>
+          <input type="text" id="username" readonly>
+        </div>
+        <div class="form-group">
+          <label for="date">Date:</label>
+          <input type="text" id="date" readonly>
+        </div>
+        <div class="form-group">
+          <label for="time">Time:</label>
+          <input type="text" id="time" readonly>
+        </div>
+        <div class="form-group">
+          <label for="location">Location:</label>
+          <input type="text" id="location" readonly>
+          <button type="button" id="get-location">Get Location</button>
+        </div>
+        <div class="form-group">
+          <label for="object-name">Medicinal Plants seen:</label>
+          <div id="object-name"></div>
+        </div>
+        <div class="form-group">
+          <label for="object-count">Radius in meter(m):</label>
+          <input type="number" id="object-count" required>
+        </div>
+        <button id="manual-location-toggle"></button>
+        <button type="submit">Submit</button>
+      </form>
+      <div id="object-list">
+        <h2>Entered List</h2>
+        <ul id="object-names">
+                    <!-- Object names and counts will be displayed here -->
+        </ul>
+    </div>
+  </main>
+  <button id="download-list">Download List</button>
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <script>
+    
+    document.addEventListener("DOMContentLoaded", function() {
+      // Function to create and append checkboxes based on the options from the JSON file
+      function createPlantCheckboxes(plantOptions) {
+        const container = document.getElementById("object-name");
+
+        for (const category in plantOptions) {
+          const categoryLabel = document.createElement("p");
+          categoryLabel.textContent = category;
+          container.appendChild(categoryLabel);
+
+          plantOptions[category].forEach((plantName) => {
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.name = "object";
+            checkbox.value = plantName;
+            checkbox.id = plantName;
+
+            const label = document.createElement("label");
+            label.htmlFor = plantName;
+            label.textContent = plantName;
+
+            container.appendChild(checkbox);
+            container.appendChild(label);
+          });
+        }
+      }
+
+      // Fetch the plant options from a JSON file
+      fetch("medicinalop.json")
+        .then((response) => response.json())
+        .then((plantOptions) => {
+          // Call the function to create checkboxes using the retrieved options
+          createPlantCheckboxes(plantOptions);
+        })
+        .catch((error) => {
+          console.error("Error fetching plant options:", error);
+        });
+
+      // ... (your existing code)
+
+      const downloadButton = document.getElementById("download-list");
+      downloadButton.addEventListener("click", function() {
+        if (objectDataArray.length > 0) {
+          const username = document.getElementById("username").value;
+          const date = document.getElementById("date").value;
+          const time = document.getElementById("time").value;
+
+          // Create a header row with headers for the CSV columns
+          const header = 'Username, Date, Time, Land Use, Radius, Latitude, Longitude';
+
+          // Create a CSV string for the object data
+          const csvData = objectDataArray.map((object) => {
+            return `${username}, ${date}, ${time}, ${object.land_use}, ${object.radius}, ${object.loc_lat}, ${object.loc_lon}`;
+          }).join('\n');
+
+          // Combine the header and object data
+          const fullCsvData = `${header}\n${csvData}`;
+
+          // Create a Blob with the CSV data
+          const blob = new Blob([fullCsvData], { type: 'text/csv' });
+
+          // Create a download link for the CSV file
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = url;
+          const filename = `land_use_${date}_${username}.csv`;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+        } else {
+          alert("The object list is empty.");
+        }
+      });
+
+      manualLocationToggle.click();
+    });
+    document.addEventListener("DOMContentLoaded", function() {
+        const params = new URLSearchParams(window.location.search);
+        const timeInput = document.getElementById("time");
+        const username = params.get("username");
+        const date = params.get("date");
+        document.getElementById("username").value = username;
+        document.getElementById("date").value = date;
+        const objectEntryForm = document.getElementById("object-entry-form");
+        const objectCountInput = document.getElementById("object-count");
+        const locationInput = document.getElementById("location");
+        const objectList = document.getElementById("object-names");
+        const mapDiv = document.getElementById("map");
+        const getLocationButton = document.getElementById("get-location");
+        const manualLocationToggle = document.getElementById("manual-location-toggle");
+        let isManualLocationMode = false;
+        let marker;
+        const objectDataArray = JSON.parse(localStorage.getItem("objectDataArray")) || [];
+        const map = L.map(mapDiv).setView([0, 0], 2);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+        }).addTo(map);
+    
+        function getCurrentTime() {
+          const now = new Date();
+          const hours = now.getHours().toString().padStart(2, "0");
+          const minutes = now.getMinutes().toString().padStart(2, "0");
+          const timeString = `${hours}:${minutes}`;
+          return timeString;
+        }
+    
+        // Update the time input every second
+        setInterval(function() {
+          const currentTime = getCurrentTime();
+          timeInput.value = currentTime;
+        }, 1000);
+        timeInput.value = getCurrentTime();
+    
+        function deleteObject(index) {
+          objectDataArray.splice(index, 1); // Remove the object at the specified index
+          updateObjectList();
+          saveObjectDataToStorage();
+        }
+    
+        // Update the object list with delete buttons
+        function updateObjectList() {
+          objectList.innerHTML = "";
+          objectDataArray.forEach(function(objectData, index) {
+            const listItem = document.createElement("li");
+            listItem.classList.add("object-item");
+            listItem.innerHTML = `
+              <div class="object-details">
+                <div class="object-info">
+                  <span class="object-property">Land used as:</span> ${objectData.land_use}
+                </div>
+                <div class="object-info">
+                  <span class="object-property">Radius:</span> ${objectData.radius}
+                </div>
+                <div class="object-info">
+                  <span class="object-property">Location:</span> lat:${objectData.loc_lat},lon:${objectData.loc_lon}
+                </div>
+                <div class="object-info">
+                  <span class="object-property">Time:</span> ${objectData.time}
+                </div>
+              </div>
+              <button class="delete-button" data-index="${index}">Delete</button> <!-- Add a delete button -->
+            `;
+            objectList.appendChild(listItem);
+          });
+    
+          // Add event listeners to delete buttons
+          const deleteButtons = document.querySelectorAll(".delete-button");
+          deleteButtons.forEach((button) => {
+            button.addEventListener("click", (event) => {
+              const index = event.currentTarget.getAttribute("data-index");
+              deleteObject(index);
+            });
+          });
+        }
+    
+        function saveObjectDataToStorage() {
+          localStorage.setItem("objectDataArray", JSON.stringify(objectDataArray));
+        }
+    
+        function addObjectData(objectNames, objectCount, location) {
+  const currentTime = getCurrentTime();
+
+  // Extract latitude and longitude
+  const locationParts = location.match(/Latitude: (.+), Longitude: (.+)/);
+  if (locationParts) {
+    const loc_lat = locationParts[1];
+    const loc_lon = locationParts[2];
+
+    objectNames.forEach((objectName) => {
+      const objectData = {
+        land_use: objectName,
+        radius: objectCount,
+        loc_lat: loc_lat,
+        loc_lon: loc_lon,
+        time: currentTime,
+      };
+      objectDataArray.push(objectData);
+    });
+
+    updateObjectList();
+    saveObjectDataToStorage();
+    objectCountInput.value = "";
+    locationInput.value = "";
+
+    if (marker) {
+      map.removeLayer(marker);
+    }
+  } else {
+    alert("Invalid location format. Please enter a location in the format 'Latitude: X, Longitude: Y'");
+  }
+}
+
+
+    
+        objectEntryForm.addEventListener("submit", function(event) {
+          event.preventDefault();
+          const objectNameCheckboxes = document.querySelectorAll("input[name=object]:checked");
+          const selectedObjectNames = [];
+          objectNameCheckboxes.forEach((checkbox) => {
+            selectedObjectNames.push(checkbox.value);
+          });
+    
+          const objectCount = objectCountInput.value.trim();
+          const location = locationInput.value.trim();
+          if (selectedObjectNames.length > 0 && objectCount && location) {
+            addObjectData(selectedObjectNames, objectCount, location);
+          } else {
+            alert("Please select at least one object name, and fill in the radius and location fields.");
+          }
+        });
+    
+        getLocationButton.addEventListener("click", () => {
+          if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+              const latitude = position.coords.latitude;
+              const longitude = position.coords.longitude;
+              const locationString = `Latitude: ${latitude}, Longitude: ${longitude}`;
+              locationInput.value = locationString;
+              if (marker) {
+                map.removeLayer(marker);
+              }
+              marker = L.marker([latitude, longitude]).addTo(map);
+            });
+          } else {
+            locationInput.value = "Geolocation is not supported in this browser.";
+          }
+        });
+    
+        manualLocationToggle.addEventListener("click", () => {
+          isManualLocationMode = !isManualLocationMode;
+          if (isManualLocationMode) {
+            manualLocationToggle.textContent = "";
+            manualLocationToggle.classList.remove("disabled");
+          } else {
+            manualLocationToggle.textContent = "Manual Location Mode (Disabled)";
+            manualLocationToggle.classList.add("disabled");
+          }
+          if (isManualLocationMode) {
+            locationInput.value = "";
+            if (marker) {
+              map.removeLayer(marker);
+            }
+          }
+        });
+    
+        map.on("click", function(e) {
+          if (isManualLocationMode) {
+            const latitude = e.latlng.lat.toFixed(6);
+            const longitude = e.latlng.lng.toFixed(6);
+            const locationString = `Latitude: ${latitude}, Longitude: ${longitude}`;
+            locationInput.value = locationString;
+            if (marker) {
+              map.removeLayer(marker);
+            }
+            marker = L.marker([latitude, longitude]).addTo(map);
+          }
+        });
+    
+        
+  const downloadButton = document.getElementById("download-list");
+  downloadButton.addEventListener("click", function() {
+    if (objectDataArray.length > 0) {
+      const username = document.getElementById("username").value;
+      const date = document.getElementById("date").value;
+      const time = document.getElementById("time").value; // Get the time value
+
+      // Create a header row with headers for the CSV columns
+      const header = 'Username, Date, Time, Land Use, Radius, Latitude, Longitude';
+
+      // Create a CSV string for the object data
+      const csvData = objectDataArray.map((object) => {
+        return `${username}, ${date}, ${time}, ${object.land_use}, ${object.radius}, ${object.loc_lat}, ${object.loc_lon}`;
+      }).join('\n');
+
+      // Combine the header and object data
+      const fullCsvData = `${header}\n${csvData}`;
+
+      // Create a Blob with the CSV data
+      const blob = new Blob([fullCsvData], { type: 'text/csv' });
+
+      // Create a download link for the CSV file
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      const filename = `medicinal_${date}_${username}.csv`;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } else {
+      alert("The object list is empty.");
+    }
+  });
+
+    
+        manualLocationToggle.click();
+      });
+      
+  
+
+  </script>
+</body>
+</html>
+

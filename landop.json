@@ -1,0 +1,13 @@
+[
+    { "value": "Acacia", "id": "acacia" },
+    { "value": "Agriculture", "id": "agriculture" },
+    { "value": "Arecanut", "id": "arecanut" },
+    { "value": "Buildings", "id": "buildings" },
+    { "value": "Coconut", "id": "coconut" },
+    { "value": "Forest", "id": "forest" },
+    { "value": "Open area", "id": "open-area" },
+    { "value": "Others", "id": "others" },
+    { "value": "Scrub Jungle", "id": "scrub-jungle" },
+    { "value": "Water", "id": "water" }
+  ]
+  
