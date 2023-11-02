@@ -31,17 +31,16 @@
       }
 
       main {
-        max-width: 1200px;
-        margin: 20px auto;
-        padding: 20px;
-        background-color: #fff;
-        border-radius: 10px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: space-between;
-        gap: 20px;
-      }
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column; /* Change the flex direction to column */
+  gap: 20px;
+}
 
       #object-list {
         flex: 1;
@@ -136,6 +135,34 @@
         font-weight: bold;
         margin-right: 5px;
       }
+      #get-location {
+  background-color: #007BFF;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+#get-location:hover {
+  background-color: #0056b3;
+}
+#object-entry-form button[type="submit"] {
+  background-color: #007BFF;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+#object-entry-form button[type="submit"]:hover {
+  background-color: #0056b3;
+}
     </style>
   </head>
   <body>
@@ -143,12 +170,7 @@
       <h1>QGIS Mapping</h1>
     </header>
     <main>
-      <div id="object-list">
-        <h2>Entered List</h2>
-        <ul id="object-names">
-          <!-- Object names and counts will be displayed here -->
-        </ul>
-      </div>
+      
       <div id="map"></div>
       <form id="object-entry-form">
         <h2>Enter Information</h2>
@@ -176,10 +198,16 @@
           <label for="location">Location:</label>
           <input type="text" id="location" readonly>
         </div>
-        <button type="button" id="manual-location-toggle" class="disabled">Manual Location Mode (Disabled)</button>
+        <button type="button" id="manual-location-toggle" class="disabled"></button>
         <button type="button" id="get-location">Get Location</button>
         <button type="submit">Submit</button>
       </form>
+      <div id="object-list">
+        <h2>Entered List</h2>
+        <ul id="object-names">
+          <!-- Object names and counts will be displayed here -->
+        </ul>
+      </div>
     </main>
     <button id="download-list">Download List</button>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -221,35 +249,47 @@
         }, 1000);
         timeInput.value = getCurrentTime();
 
-        function updateObjectList() {
-          objectList.innerHTML = "";
-          objectDataArray.forEach(function(objectData) {
-            const listItem = document.createElement("li");
-            listItem.classList.add("object-item");
-            listItem.innerHTML = `
-            
-											<div class="object-details">
-												<div class="object-info">
-													<span class="object-property">Name:</span> ${objectData.name}
-                
-												</div>
-												<div class="object-info">
-													<span class="object-property">Count:</span> ${objectData.count}
-                
-												</div>
-												<div class="object-info">
-													<span class="object-property">Location:</span> ${objectData.location}
-                
-												</div>
-												<div class="object-info">
-													<span class="object-property">Time:</span> ${objectData.time}
-                
-												</div>
-											</div>
-        `;
-            objectList.appendChild(listItem);
-          });
-        }
+        function deleteObject(index) {
+    objectDataArray.splice(index, 1); // Remove the object at the specified index
+    updateObjectList();
+    saveObjectDataToStorage();
+  }
+
+  // Update the object list with delete buttons
+  function updateObjectList() {
+    objectList.innerHTML = "";
+    objectDataArray.forEach(function(objectData, index) {
+      const listItem = document.createElement("li");
+      listItem.classList.add("object-item");
+      listItem.innerHTML = `
+        <div class="object-details">
+          <div class="object-info">
+            <span class="object-property">Name:</span> ${objectData.name}
+          </div>
+          <div class="object-info">
+            <span class="object-property">Count:</span> ${objectData.count}
+          </div>
+          <div class="object-info">
+            <span class="object-property">Location:</span> ${objectData.location}
+          </div>
+          <div class="object-info">
+            <span class="object-property">Time:</span> ${objectData.time}
+          </div>
+        </div>
+        <button class="delete-button" data-index="${index}">Delete</button> <!-- Add a delete button -->
+      `;
+      objectList.appendChild(listItem);
+    });
+
+    // Add event listeners to delete buttons
+    const deleteButtons = document.querySelectorAll(".delete-button");
+    deleteButtons.forEach((button) => {
+      button.addEventListener("click", (event) => {
+        const index = event.currentTarget.getAttribute("data-index");
+        deleteObject(index);
+      });
+    });
+  }
 
         function saveObjectDataToStorage() {
           localStorage.setItem("objectDataArray", JSON.stringify(objectDataArray));
